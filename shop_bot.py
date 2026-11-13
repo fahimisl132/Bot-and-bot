@@ -284,6 +284,45 @@ async def cmd_id(m: Message):
     await m.answer(f"Your Telegram ID: <code>{m.from_user.id}</code>")
 
 
+@main_r.message(Command("debug"))
+async def cmd_debug(m: Message, state: FSMContext):
+    if not is_admin(m.from_user.id):
+        return
+    import platform
+
+    try:
+        import aiogram
+
+        av = aiogram.__version__
+    except Exception:
+        av = "?"
+    try:
+        import openpyxl
+
+        ov = openpyxl.__version__
+    except ImportError:
+        ov = "NOT installed (needed for .xlsx)"
+    cats = q1("SELECT COUNT(*) AS n, COALESCE(SUM(is_sellable),0) AS s FROM categories")
+    pending = q1(
+        "SELECT COUNT(*) AS n FROM categories c WHERE is_sellable=0 "
+        "AND NOT EXISTS (SELECT 1 FROM categories k WHERE k.parent_id=c.id)"
+    )["n"]
+    st_av = q1("SELECT COUNT(*) AS n FROM stock WHERE status='available'")["n"]
+    st_sold = q1("SELECT COUNT(*) AS n FROM stock WHERE status='sold'")["n"]
+    await m.answer(
+        "🔧 <b>Debug info</b>\n\n"
+        f"Python: {platform.python_version()}\n"
+        f"aiogram: {esc(av)}\n"
+        f"openpyxl: {esc(ov)}\n"
+        f"Database: <code>{esc(DB_FILE)}</code>\n"
+        f"Products (all nodes): {cats['n']}\n"
+        f"Sellable products: {cats['s']}\n"
+        f"Empty/pending items (🔹, not sellable): {pending}\n"
+        f"Stock available: {st_av} | sold: {st_sold}\n"
+        f"Your current state: {esc(await state.get_state())}"
+    )
+
+
 @main_r.message(F.text == "👤 Profile")
 async def menu_profile(m: Message, state: FSMContext):
     await state.clear()
@@ -922,7 +961,21 @@ def parse_xlsx(raw):
     from openpyxl import load_workbook  # pip install openpyxl
 
     wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-    rows = [[cell_to_str(c) for c in row] for row in wb.active.iter_rows(values_only=True)]
+    ws = wb.active
+    try:
+        ws.reset_dimensions()  # some tools write a wrong sheet size; read the real data
+    except Exception:
+        pass
+    rows, blanks = [], 0
+    for row in ws.iter_rows(values_only=True):
+        cells = [cell_to_str(c) for c in row]
+        if any(c.strip() for c in cells):
+            blanks = 0
+        else:
+            blanks += 1
+            if blanks > 1000:  # formatted-but-empty rows at the end of a sheet
+                break
+        rows.append(cells)
     wb.close()
     return build_items(rows)
 
@@ -1268,6 +1321,30 @@ async def sm_del_n(m: Message, state: FSMContext):
     await m.answer(f"✅ Deleted {n} item(s).\n\n" + text, reply_markup=kb)
 
 
+# ============================== ERROR REPORTER ==============================
+async def on_error(event, bot: Bot):
+    """Any crash inside a handler is logged and the error text is sent to the admin who triggered it."""
+    exc = event.exception
+    logging.error("Unhandled error", exc_info=exc)
+    upd = event.update
+    cbq = getattr(upd, "callback_query", None)
+    msg = getattr(upd, "message", None)
+    user = cbq.from_user if cbq else (msg.from_user if msg else None)
+    if cbq:
+        try:
+            await cbq.answer()
+        except Exception:
+            pass
+    if user and is_admin(user.id):
+        try:
+            await bot.send_message(
+                user.id, f"⚠️ <b>Bot error</b>\n<code>{esc(type(exc).__name__)}: {esc(str(exc)[:300])}</code>"
+            )
+        except Exception:
+            pass
+    return True
+
+
 # ============================== RUN ==============================
 async def main():
     if not BOT_TOKEN:
@@ -1283,8 +1360,9 @@ async def main():
     dp = Dispatcher()
     dp.include_router(main_r)
     dp.include_router(admin_r)
+    dp.errors.register(on_error)
     await bot.delete_webhook(drop_pending_updates=True)
-    print("Bot started.")
+    print(f"Bot started. Database: {DB_FILE}")
     await dp.start_polling(bot)
 
 
