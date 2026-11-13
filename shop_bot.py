@@ -1180,7 +1180,7 @@ async def sm_file_hint(m: Message):
 @admin_r.message(StockS.manual, F.text)
 async def sm_manual(m: Message, state: FSMContext):
     d = await state.get_data()
-    items = [ln.strip() for ln in m.text.splitlines() if ln.strip()]
+    items = [(ln.strip(), None) for ln in m.text.splitlines() if ln.strip()]
     await finish_add(m, state, d["pid"], items)
 
 
