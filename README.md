@@ -1,50 +1,33 @@
 # Telegram Sales Bot
 
-A Telegram Sales Bot built with Python and Aiogram 3.x.
+A Telegram-based automated sales bot with product management,
+stock management, customer profiles, wallet system and admin panel.
 
 ## Features
 
-- Customer Main Menu
-- User Profile
+- Customer Profile
+- Flexible Product Categories
+- Unlimited Nested Product Options
 - Product Management
-- Nested Product Categories
-- Add / Edit / Remove Products
-- Set Product Prices
-- Hide / Show Products
+- Stock Management
+- CSV Stock Upload
+- Excel (XLSX) Stock Upload
+- Manual Stock Entry
+- Stock Export
 - Admin Panel
+- Multiple Admin Support
 - SQLite Database
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10 or higher
 - Telegram Bot Token
-- Telegram User ID
+- Telegram Owner ID
 
 ## Installation
 
-Install dependencies:
+### 1. Clone Repository
 
-pip install -r requirements.txt
-
-## Environment Variables
-
-Configure these variables in Railway:
-
-BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-OWNER_ID=YOUR_TELEGRAM_USER_ID
-
-## Run Locally
-
-python shop_bot.py
-
-## Railway Deployment
-
-1. Upload the project to GitHub.
-2. Connect the GitHub repository to Railway.
-3. Add BOT_TOKEN in Railway Variables.
-4. Add OWNER_ID in Railway Variables.
-5. Deploy the project.
-
-## Main File
-
-shop_bot.py
+```bash
+git clone https://github.com/JanKug100/telegram-sales-bot.git
+cd telegram-sales-bot
